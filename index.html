@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centro Pokémon - Registro</title>
+    <style>
+        /* Estilização básica */
+        body {
+            font-family: sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        input {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #ef5350;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #d32f2f;
+        }
+
+        .registro-item {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+
+        .registro-item img {
+            width: 50px;
+            height: 50px;
+            margin-right: 15px;
+        }
+
+        .info {
+            font-size: 13px;
+            color: #444;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card">
+        <h2>Registro de Treinador</h2>
+
+        <input type="text" id="nome-treinador" placeholder="Seu nome">
+        <input type="text" id="nome-pokemon" placeholder="Seu Pokémon favorito">
+        <button id="btn-registrar">Registrar Entrada</button>
+
+        <div id="status" style="font-size: 11px; color: blue; margin: 5px 0;"></div>
+
+        <h3>Histórico Recente</h3>
+        <div id="lista-historico">
+        </div>
+
+        <button id="btn-limpar" style="background: none; color: #999; font-size: 11px; margin-top: 10px;">
+            Limpar Histórico
+        </button>
+    </div>
+
+    <script>
+        // --- PASSO 1: Seleção de Elementos ---
+        const inputTreinador = document.querySelector('#nome-treinador');
+        const inputPokemon = document.querySelector('#nome-pokemon');
+        const btnRegistrar = document.querySelector('#btn-registrar');
+        const listaUI = document.querySelector('#lista-historico');
+        const statusTxt = document.querySelector('#status');
+
+        // --- PASSO 2: Função de Renderização (Mostrar na tela) ---
+        function renderizarHistorico() {
+            // Buscamos no LocalStorage e transformamos de volta em Array (JSON.parse)
+            // Se não houver nada, usamos um array vazio [].
+            const historico = JSON.parse(localStorage.getItem('PokeLog') || '[]');
+
+            // Mapeamos o array para criar o HTML de cada item
+            listaUI.innerHTML = historico.map(item => `
+                <div class="registro-item">
+                    <img src="${item.fotoUrl}">
+                    <div class="info">
+                        <strong>${item.treinador}</strong>
+                        visitou com <strong>${item.pokemon}</strong><br>
+                        <small>${item.dataHora}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- PASSO 3: Função para Buscar na API (Fetch) ---
+        async function buscarDadosPokemon(pokemon) {
+            try {
+                const resposta = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemon.toLowerCase()}`);
+
+                if (!resposta.ok) return null; // Se o pokémon não existir, retorna nulo
+
+                const dados = await resposta.json();
+                // Retornamos apenas a URL da imagem que nos interessa
+                return dados.sprites.front_default;
+            } catch (erro) {
+                console.error("Erro na requisição:", erro);
+                return null;
+            }
+        }
+
+        // --- PASSO 4: Evento de Registro ---
+        btnRegistrar.addEventListener('click', async () => {
+            const nomeT = inputTreinador.value.trim();
+            const nomeP = inputPokemon.value.trim();
+
+            if (nomeT === "" || nomeP === "") {
+                alert("Preencha todos os campos!");
+                return;
+            }
+
+            statusTxt.innerText = "Consultando Pokédex...";
+            btnRegistrar.disabled = true;
+
+            const foto = await buscarDadosPokemon(nomeP);
+
+            if (foto) {
+                // Criamos o objeto com as informações
+                const novoAcesso = {
+                    treinador: nomeT,
+                    pokemon: nomeP,
+                    fotoUrl: foto,
+                    dataHora: new Date().toLocaleString('pt-BR')
+                };
+
+                // Pegamos o histórico atual do WebStorage
+                const historicoAtual = JSON.parse(localStorage.getItem('PokeLog') || '[]');
+
+                // Adicionamos o novo no início e limitamos a 5 itens
+                historicoAtual.unshift(novoAcesso);
+                const historicoLimitado = historicoAtual.slice(0, 5);
+
+                // Salvamos no WebStorage como texto (JSON.stringify)
+                localStorage.setItem('PokeLog', JSON.stringify(historicoLimitado));
+
+                // Limpamos os inputs e atualizamos a tela
+                inputTreinador.value = "";
+                inputPokemon.value = "";
+                statusTxt.innerText = "";
+                renderizarHistorico();
+            } else {
+                statusTxt.innerText = "Pokémon não encontrado!";
+            }
+
+            btnRegistrar.disabled = false;
+        });
+
+        // --- PASSO 5: Limpar Dados ---
+        document.querySelector('#btn-limpar').addEventListener('click', () => {
+            localStorage.removeItem('PokeLog');
+            renderizarHistorico();
+        });
+
+        // Inicializa a tela ao abrir a página
+        renderizarHistorico();
+    </script>
+
+</body>
+
+</html>
